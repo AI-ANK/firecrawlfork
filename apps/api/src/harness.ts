@@ -522,13 +522,28 @@ async function setupNuqPostgres(): Promise<Services["nuqPostgres"]> {
     return undefined;
   }
 
+  // Check if PostgreSQL is already running on the system (e.g. installed via apt/brew)
+  try {
+    await waitForPostgres("localhost", Number(POSTGRES_PORT), 3000);
+    logger.section("Using system PostgreSQL (already running)");
+    const dbUrl = `postgresql://${encodeURIComponent(POSTGRES_USER)}:${encodeURIComponent(POSTGRES_PASSWORD)}@localhost:${POSTGRES_PORT}/${encodeURIComponent(POSTGRES_DB)}`;
+    config.NUQ_DATABASE_URL = dbUrl;
+    config.NUQ_DATABASE_URL_LISTEN = dbUrl;
+    process.env.NUQ_DATABASE_URL = dbUrl;
+    process.env.NUQ_DATABASE_URL_LISTEN = dbUrl;
+    logger.success("NUQ PostgreSQL connection configured (system service)");
+    return undefined;
+  } catch {
+    // PostgreSQL not running on system, fall through to container setup
+  }
+
   // Running locally: manage container
   logger.section("Setting up NUQ PostgreSQL container");
 
   const runtime = await detectContainerRuntime();
   if (!runtime) {
     throw new Error(
-      "Neither Docker nor Podman found. Please install Docker/Podman or set NUQ_DATABASE_URL manually.",
+      "Neither Docker nor Podman found, and PostgreSQL is not running on the system. Please install PostgreSQL (e.g. apt install postgresql), or install Docker/Podman, or set NUQ_DATABASE_URL manually.",
     );
   }
 
@@ -627,13 +642,26 @@ async function setupNuqRabbitMQ(): Promise<Services["nuqRabbitMQ"]> {
     return undefined;
   }
 
+  // Check if RabbitMQ is already running on the system (e.g. installed via apt/brew)
+  try {
+    await waitForRabbitMQ("localhost", 5672, 3000);
+    logger.section("Using system RabbitMQ (already running)");
+    const rabbitUrl = "amqp://localhost:5672";
+    config.NUQ_RABBITMQ_URL = rabbitUrl;
+    process.env.NUQ_RABBITMQ_URL = rabbitUrl;
+    logger.success("NUQ RabbitMQ connection configured (system service)");
+    return undefined;
+  } catch {
+    // RabbitMQ not running on system, fall through to container setup
+  }
+
   // Running locally: manage container
   logger.section("Setting up NUQ RabbitMQ container");
 
   const runtime = await detectContainerRuntime();
   if (!runtime) {
     throw new Error(
-      "Neither Docker nor Podman found. Please install Docker/Podman or set NUQ_RABBITMQ_URL manually.",
+      "Neither Docker nor Podman found, and RabbitMQ is not running on the system. Please install RabbitMQ (e.g. apt install rabbitmq-server), or install Docker/Podman, or set NUQ_RABBITMQ_URL manually.",
     );
   }
 
